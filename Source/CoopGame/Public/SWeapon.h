@@ -6,10 +6,17 @@
 #include "GameFramework/Actor.h"
 #include "SWeapon.generated.h"
 
+class USkeletalMeshComponent;
+
 UCLASS()
 class COOPGAME_API ASWeapon : public AActor
 {
 	GENERATED_BODY()
+
+protected:
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	USkeletalMeshComponent* SkeletalMeshComponent;
 	
 public:	
 	// Sets default values for this actor's properties
