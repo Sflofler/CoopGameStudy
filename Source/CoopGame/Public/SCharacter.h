@@ -14,6 +14,18 @@ class COOPGAME_API ASCharacter : public ACharacter
 {
 	GENERATED_BODY()
 
+public:
+	
+	// Sets default values for this character's properties
+	ASCharacter();
+
+	// Called every frame
+	virtual void Tick(float DeltaTime) override;
+	// Called to bind functionality to input
+	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
+
+	virtual FVector GetPawnViewLocation() const override;
+
 protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
@@ -22,20 +34,15 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	USpringArmComponent* SpringArmComponent;
 
-public:
-	
-	// Sets default values for this character's properties
-	ASCharacter();
+	bool bWantsToZoom;
 
-	// Called every frame
-	virtual void Tick(float DeltaTime) override;
-	
-	// Called to bind functionality to input
-	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
+	UPROPERTY(EditDefaultsOnly, Category = "Player")
+	float ZoomedFOV;
 
-	virtual FVector GetPawnViewLocation() const override;
+	float DefaultFOV;
 
-protected:
+	UPROPERTY(EditDefaultsOnly, Category = "Player", meta = (ClampMin = 0.1f, ClampMax = 100.0f))
+	float ZoomInterpolationSpeed;
 	
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
@@ -49,4 +56,8 @@ protected:
 	void EndCrouch();
 
 	void BeginJump();
+
+	void BeginZoom();
+
+	void EndZoom();
 };
