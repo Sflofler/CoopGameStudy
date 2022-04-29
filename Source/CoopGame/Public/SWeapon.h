@@ -49,5 +49,5 @@ protected:
 	virtual void BeginPlay() override;
 
 	UFUNCTION(BlueprintCallable)
-	void Fire();
+	virtual void Fire();
 };
