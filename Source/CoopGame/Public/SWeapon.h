@@ -30,6 +30,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
 	TSubclassOf<UDamageType> DamageType;
 
+	UPROPERTY(EditDefaultsOnly, Category = "Weapon")
+	TSubclassOf<UCameraShakeBase> FireCameraShake;
+
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
 	FName MuzzleSocketName;
 
@@ -43,7 +46,13 @@ protected:
 	UParticleSystem* ImpactEffect;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
+	UParticleSystem* FleshImpactEffect;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
 	UParticleSystem* TracerEffect;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Weapon")
+	float BaseDamage;
 
 	void PlayFireEffects(const FVector TracerEndPoint) const;
 };
