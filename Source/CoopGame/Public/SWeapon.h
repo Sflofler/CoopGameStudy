@@ -19,8 +19,8 @@ public:
 	// Sets default values for this actor's properties
 	ASWeapon();
 
-	// Called every frame
-	virtual void Tick(float DeltaTime) override;
+	UFUNCTION(BlueprintCallable)
+	virtual void Fire();
 	
 protected:
 	
@@ -44,10 +44,6 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
 	UParticleSystem* TracerEffect;
-	
-	// Called when the game starts or when spawned
-	virtual void BeginPlay() override;
 
-	UFUNCTION(BlueprintCallable)
-	virtual void Fire();
+	void PlayFireEffects(const FVector TracerEndPoint) const;
 };
