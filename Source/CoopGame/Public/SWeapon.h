@@ -18,9 +18,12 @@ class COOPGAME_API ASWeapon : public AActor
 public:	
 	// Sets default values for this actor's properties
 	ASWeapon();
-
-	UFUNCTION(BlueprintCallable)
+	
 	virtual void Fire();
+
+	void StartFire();
+
+	void StopFire();
 	
 protected:
 	
@@ -53,6 +56,17 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Weapon")
 	float BaseDamage;
+
+	float LastFireTime;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Weapon")
+	float RateOfFire;
+
+	float TimeBetweenShots;
+
+	FTimerHandle TimerHande_TimeBetweenShots;
+
+	virtual void BeginPlay() override;
 
 	void PlayFireEffects(const FVector TracerEndPoint) const;
 };
