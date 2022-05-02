@@ -9,6 +9,7 @@
 class UCameraComponent;
 class USpringArmComponent;
 class ASWeapon;
+class USHealthComponent;
 
 UCLASS()
 class COOPGAME_API ASCharacter : public ACharacter
@@ -38,6 +39,8 @@ protected:
 
 	ASWeapon* CurrentWeapon;
 
+	USHealthComponent* HealthComponent;
+
 	UPROPERTY(EditDefaultsOnly, Category = "Player")
 	TSubclassOf<ASWeapon> StarterWeaponClass;
 
@@ -53,6 +56,9 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Player", meta = (ClampMin = 0.1f, ClampMax = 100.0f))
 	float ZoomInterpolationSpeed;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Player")
+	bool bDied;
 	
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
@@ -74,4 +80,7 @@ protected:
 	void StartFire();
 
 	void StopFire();
+
+	UFUNCTION()
+	void HandleHealthChanged(USHealthComponent* UsHealthComponent, float Health, float HealthDelta, const UDamageType* DamageType, AController* InstigatedBy, AActor* DamageCauser);
 };
