@@ -3,7 +3,9 @@
 
 #include "AExplosiveBarrel.h"
 
+#include "Components/SHealthComponent.h"
 #include "Kismet/GameplayStatics.h"
+#include "PhysicsEngine/RadialForceComponent.h"
 
 // Sets default values
 AAExplosiveBarrel::AAExplosiveBarrel()
