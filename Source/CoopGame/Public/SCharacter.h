@@ -39,6 +39,7 @@ protected:
 
 	ASWeapon* CurrentWeapon;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	USHealthComponent* HealthComponent;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Player")
