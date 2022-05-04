@@ -3,10 +3,14 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Components/SHealthComponent.h"
 #include "GameFramework/Actor.h"
-#include "PhysicsEngine/RadialForceComponent.h"
 #include "AExplosiveBarrel.generated.h"
+
+class USHealthComponent;
+class UStaticMeshComponent;
+class URadialForceComponent;
+class UParticleSystem;
+class UMaterialInterface;
 
 UCLASS()
 class COOPGAME_API AAExplosiveBarrel : public AActor
