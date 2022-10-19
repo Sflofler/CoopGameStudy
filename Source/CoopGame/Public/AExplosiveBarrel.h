@@ -37,6 +37,7 @@ protected:
 	UPROPERTY(VisibleAnywhere, Category = "Components")
 	TSubclassOf<UDamageType> DamageTypeClass;
 
+	UPROPERTY(ReplicatedUsing=OnRep_Exploded)
 	bool bExploded;
 
 	UPROPERTY(EditDefaultsOnly, Category = "FX")
@@ -50,4 +51,7 @@ protected:
 
 	UFUNCTION()
 	void HandleHealthChanged(USHealthComponent* OwningHealthComponent, float Health, float HealthDelta, const UDamageType* DamageType, AController* InstigatedBy, AActor* DamageCauser);
+
+	UFUNCTION()
+	void OnRep_Exploded();
 };
