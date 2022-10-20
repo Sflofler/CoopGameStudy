@@ -1,45 +1,58 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-
 #include "AI/STrackerBot.h"
 
-#include "NavigationPath.h"
-#include "NavigationSystem.h"
-#include "SCharacter.h"
-#include "Components/SHealthComponent.h"
-#include "Components/SphereComponent.h"
-#include "GameFramework/Character.h"
+#include "Components/StaticMeshComponent.h"
 #include "Kismet/GameplayStatics.h"
+#include "NavigationSystem.h"
+#include "NavigationPath.h"
+#include "GameFramework/Character.h"
+#include "DrawDebugHelpers.h"
+#include "SCharacter.h"
+#include "Components/SphereComponent.h"
+#include "EngineUtils.h"
+#include "Components/SHealthComponent.h"
 #include "Sound/SoundCue.h"
+
+static int32 DebugTrackerBotDrawing = 0;
+FAutoConsoleVariableRef CVARDebugTrackerBotDrawing(
+	TEXT("COOP.DebugTrackerBot"),
+	DebugTrackerBotDrawing,
+	TEXT("Draw Debug Lines for TrackerBot"),
+	ECVF_Cheat);
+
 
 // Sets default values
 ASTrackerBot::ASTrackerBot()
 {
- 	// Set this pawn to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
+	// Set this pawn to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
 
-	StaticMeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MeshComponent"));
-	StaticMeshComponent->SetCanEverAffectNavigation(false);
-	StaticMeshComponent->SetSimulatePhysics(true);
-	RootComponent = StaticMeshComponent;
+	MeshComp = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MeshComp"));
+	MeshComp->SetCanEverAffectNavigation(false);
+	MeshComp->SetSimulatePhysics(true);
+	RootComponent = MeshComp;
 
-	HealthComponent = CreateDefaultSubobject<USHealthComponent>(TEXT("HealthComponent"));
-	HealthComponent->OnHealthChanged.AddDynamic(this, &ASTrackerBot::HandleHealthChanged);
+	HealthComp = CreateDefaultSubobject<USHealthComponent>(TEXT("HealthComp"));
+	HealthComp->OnHealthChanged.AddDynamic(this, &ASTrackerBot::HandleTakeDamage);
 
-	SphereComponent = CreateDefaultSubobject<USphereComponent>(TEXT("SphereComponent"));
-	SphereComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-	SphereComponent->SetCollisionResponseToAllChannels(ECR_Ignore);
-	SphereComponent->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
-	SphereComponent->SetSphereRadius(200.0f);
-	SphereComponent->SetupAttachment(RootComponent);
+	SphereComp = CreateDefaultSubobject<USphereComponent>(TEXT("SphereComp"));
+	SphereComp->SetSphereRadius(200);
+	SphereComp->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	SphereComp->SetCollisionResponseToAllChannels(ECR_Ignore);
+	SphereComp->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
+	SphereComp->SetupAttachment(RootComponent);
 
-	MovementForce = 1000.0f;
-	RequiredDistanceToTarget = 100.0f;
-	ExplosionRadius = 200.0f;
-	ExplosionDamage = 40.0f;
 	bUseVelocityChange = false;
+	MovementForce = 1000;
+	RequiredDistanceToTarget = 100;
 
-	SelfDamageInterval = .25f;
+	ExplosionDamage = 60;
+	ExplosionRadius = 350;
+
+	bExploded = false;
+
+	SelfDamageInterval = 0.25f;
 }
 
 // Called when the game starts or when spawned
@@ -47,122 +60,108 @@ void ASTrackerBot::BeginPlay()
 {
 	Super::BeginPlay();
 
-	if(GetLocalRole() == ROLE_Authority)
+	if (HasAuthority())
 	{
 		NextPathPoint = GetNextPathPoint();
+		
+		FTimerHandle TimerHandle_CheckPowerLevel;
+		GetWorldTimerManager().SetTimer(TimerHandle_CheckPowerLevel, this, &ASTrackerBot::OnCheckNearbyBots, 1.0f, true);
 	}
 }
 
-// Called every frame
-void ASTrackerBot::Tick(float DeltaTime)
+void ASTrackerBot::HandleTakeDamage(USHealthComponent* OwningHealthComp, float Health, float HealthDelta, const class UDamageType* DamageType, class AController* InstigatedBy, AActor* DamageCauser)
 {
-	Super::Tick(DeltaTime);
-
-	if(GetLocalRole() != ROLE_Authority && bExploded)
+	if (MatInst == nullptr)
 	{
-		return;
+		MatInst = MeshComp->CreateAndSetMaterialInstanceDynamicFromMaterial(0, MeshComp->GetMaterial(0));
 	}
 
-	const float DistanceToTarget = (GetActorLocation() - NextPathPoint).Size();
-
-	if(DistanceToTarget <= RequiredDistanceToTarget)
+	if (MatInst)
 	{
-		NextPathPoint = GetNextPathPoint();
-	}
-	else
-	{
-		FVector ForceDirection = NextPathPoint - GetActorLocation();
-		ForceDirection.Normalize();
-
-		ForceDirection *= MovementForce;
-
-		StaticMeshComponent->AddForce(ForceDirection, NAME_None, bUseVelocityChange);
-	}
-}
-
-void ASTrackerBot::NotifyActorBeginOverlap(AActor* OtherActor)
-{
-	Super::NotifyActorBeginOverlap(OtherActor);
-	
-	if(bStartedSelfDestruction && bExploded)
-	{
-		return;
+		MatInst->SetScalarParameterValue("LastTimeDamageTaken", GetWorld()->TimeSeconds);
 	}
 	
-	ASCharacter* PlayerPawn = Cast<ASCharacter>(OtherActor);
-
-	if(PlayerPawn)
+	if (Health <= 0.0f)
 	{
-		if(GetLocalRole() == ROLE_Authority)
-		{
-			GetWorldTimerManager().SetTimer(TimerHandle_SelfDamage, this, &ASTrackerBot::DamageSelf, SelfDamageInterval, true, 0.0f);
-		}
-
-		bStartedSelfDestruction = true;
-
-		UGameplayStatics::SpawnSoundAttached(SelfDestructSound, RootComponent);
+		SelfDestruct();
 	}
 }
 
 FVector ASTrackerBot::GetNextPathPoint()
 {
-	ACharacter* PlayerPawn = UGameplayStatics::GetPlayerCharacter(this, 0);
+	AActor* BestTarget = nullptr;
+	float NearestTargetDistance = FLT_MAX;
 
-	UNavigationPath* NavigationPath = UNavigationSystemV1::FindPathToActorSynchronously(this, GetActorLocation(), PlayerPawn);
-
-	if(NavigationPath->PathPoints.Num() > 1)
+	for (TActorIterator<ASCharacter> It(GetWorld()); It; ++It)
 	{
-		return NavigationPath->PathPoints[1];
+		ASCharacter* TestPawn = *It;
+		
+		if (TestPawn == nullptr)
+		{
+			continue;
+		}
+
+		const USHealthComponent* TestPawnHealthComp = Cast<USHealthComponent>(TestPawn->GetComponentByClass(USHealthComponent::StaticClass()));
+		
+		if (TestPawnHealthComp && TestPawnHealthComp->GetHealth() > 0.0f)
+		{
+			const float Distance = (TestPawn->GetActorLocation() - GetActorLocation()).Size();
+
+			if (Distance < NearestTargetDistance)
+			{
+				BestTarget = TestPawn;
+				NearestTargetDistance = Distance;
+			}
+		}
 	}
 
-	return GetActorLocation();
-}
-
-void ASTrackerBot::HandleHealthChanged(USHealthComponent* UsHealthComponent, float Health, float HealthDelta,
-	const UDamageType* DamageType, AController* InstigatedBy, AActor* DamageCauser)
-{
-	if(MaterialInstanceDynamic == nullptr)
+	if (BestTarget)
 	{
-		MaterialInstanceDynamic = StaticMeshComponent->CreateAndSetMaterialInstanceDynamicFromMaterial(0, StaticMeshComponent->GetMaterial(0));
-	}
+		UNavigationPath* NavPath = UNavigationSystemV1::FindPathToActorSynchronously(this, GetActorLocation(), BestTarget);
+		
+		GetWorldTimerManager().ClearTimer(TimerHandle_RefreshPath);
+		GetWorldTimerManager().SetTimer(TimerHandle_RefreshPath, this, &ASTrackerBot::RefreshPath , 5.0f, false);
 
-	if(MaterialInstanceDynamic)
-	{
-		MaterialInstanceDynamic->SetScalarParameterValue("LastTimeDamageTaken", GetWorld()->TimeSeconds);
-	}
-
-	if(Health <= 0)
-	{
-		SelfDestruct();
+		if (NavPath && NavPath->PathPoints.Num() > 1)
+		{
+			return NavPath->PathPoints[1];
+		}
 	}
 	
-	UE_LOG(LogTemp, Log, TEXT("Health %s of %s"), *FString::SanitizeFloat(Health), *GetName());
+	return GetActorLocation();
 }
 
 void ASTrackerBot::SelfDestruct()
 {
-	if(bExploded)
+	if (bExploded)
 	{
 		return;
 	}
 
 	bExploded = true;
 
-	StaticMeshComponent->SetVisibility(false);
-	StaticMeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	
 	UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), ExplosionEffect, GetActorLocation());
-	UGameplayStatics::PlaySoundAtLocation(this, ExplosionSound, GetActorLocation());
 
-	if(GetLocalRole() == ROLE_Authority)
+	UGameplayStatics::PlaySoundAtLocation(this, ExplodeSound, GetActorLocation());
+
+	MeshComp->SetVisibility(false, true);
+	MeshComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+	if (HasAuthority())
 	{
 		TArray<AActor*> IgnoredActors;
 		IgnoredActors.Add(this);
-	
-		UGameplayStatics::ApplyRadialDamage(this, ExplosionDamage, GetActorLocation(), ExplosionRadius, nullptr, IgnoredActors, this, GetInstigatorController(), true);
+		
+		const float ActualDamage = ExplosionDamage + (ExplosionDamage * PowerLevel);
+		
+		UGameplayStatics::ApplyRadialDamage(this, ActualDamage, GetActorLocation(), ExplosionRadius, nullptr, IgnoredActors, this, GetInstigatorController(), true);
 
+		if (DebugTrackerBotDrawing)
+		{
+			DrawDebugSphere(GetWorld(), GetActorLocation(), ExplosionRadius, 12, FColor::Red, false, 2.0f, 0, 1.0f);
+		}
 		SetLifeSpan(2.0f);
-	}	
+	}
 }
 
 void ASTrackerBot::DamageSelf()
@@ -170,10 +169,122 @@ void ASTrackerBot::DamageSelf()
 	UGameplayStatics::ApplyDamage(this, 20, GetInstigatorController(), this, nullptr);
 }
 
-// Called to bind functionality to input
-void ASTrackerBot::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
+// Called every frame
+void ASTrackerBot::Tick(float DeltaTime)
 {
-	Super::SetupPlayerInputComponent(PlayerInputComponent);
+	Super::Tick(DeltaTime);
 
+	if (HasAuthority() && !bExploded)
+	{
+		const float DistanceToTarget = (GetActorLocation() - NextPathPoint).Size();
+
+		if (DistanceToTarget <= RequiredDistanceToTarget)
+		{
+			NextPathPoint = GetNextPathPoint();
+
+			if (DebugTrackerBotDrawing)
+			{
+				DrawDebugString(GetWorld(), GetActorLocation(), "Target Reached!");
+			}
+		}
+		else
+		{
+			FVector ForceDirection = NextPathPoint - GetActorLocation();
+			ForceDirection.Normalize();
+
+			ForceDirection *= MovementForce;
+
+			MeshComp->AddForce(ForceDirection, NAME_None, bUseVelocityChange);
+
+			if (DebugTrackerBotDrawing)
+			{
+				DrawDebugDirectionalArrow(GetWorld(), GetActorLocation(), GetActorLocation() + ForceDirection, 32, FColor::Yellow, false, 0.0f, 0, 1.0f);
+			}
+		}
+
+		if (DebugTrackerBotDrawing)
+		{
+			DrawDebugSphere(GetWorld(), NextPathPoint, 20, 12, FColor::Yellow, false, 0.0f, 1.0f);
+		}
+	}
+}
+
+void ASTrackerBot::NotifyActorBeginOverlap(AActor* OtherActor)
+{
+	Super::NotifyActorBeginOverlap(OtherActor);
+
+	if (!bStartedSelfDestruction && !bExploded)
+	{
+		ASCharacter* PlayerPawn = Cast<ASCharacter>(OtherActor);
+		if (PlayerPawn && !USHealthComponent::IsFriendly(OtherActor, this))
+		{
+			if (HasAuthority())
+			{
+				GetWorldTimerManager().SetTimer(TimerHandle_SelfDamage, this, &ASTrackerBot::DamageSelf, SelfDamageInterval, true, 0.0f);
+			}
+
+			bStartedSelfDestruction = true;
+
+			UGameplayStatics::SpawnSoundAttached(SelfDestructSound, RootComponent);
+		}
+	}
+}
+
+void ASTrackerBot::OnCheckNearbyBots()
+{
+	const float Radius = 600;
+	
+	FCollisionShape CollShape;
+	CollShape.SetSphere(Radius);
+	
+	FCollisionObjectQueryParams QueryParams;
+
+	QueryParams.AddObjectTypesToQuery(ECC_PhysicsBody);
+	QueryParams.AddObjectTypesToQuery(ECC_Pawn);
+
+	TArray<FOverlapResult> Overlaps;
+	GetWorld()->OverlapMultiByObjectType(Overlaps, GetActorLocation(), FQuat::Identity, QueryParams, CollShape);
+
+	if (DebugTrackerBotDrawing)
+	{
+		DrawDebugSphere(GetWorld(), GetActorLocation(), Radius, 12, FColor::White, false, 1.0f);
+	}
+
+	int32 NrOfBots = 0;
+
+	for (FOverlapResult Result : Overlaps)
+	{
+		ASTrackerBot* Bot = Cast<ASTrackerBot>(Result.GetActor());
+
+		if (Bot && Bot != this)
+		{
+			NrOfBots++;
+		}
+	}
+
+	const int32 MaxPowerLevel = 4;
+	
+	PowerLevel = FMath::Clamp(NrOfBots, 0, MaxPowerLevel);
+	
+	if (MatInst == nullptr)
+	{
+		MatInst = MeshComp->CreateAndSetMaterialInstanceDynamicFromMaterial(0, MeshComp->GetMaterial(0));
+	}
+	if (MatInst)
+	{
+		float Alpha = PowerLevel / (float)MaxPowerLevel;
+
+		MatInst->SetScalarParameterValue("PowerLevelAlpha", Alpha);
+	}
+
+	if (DebugTrackerBotDrawing)
+	{
+		DrawDebugString(GetWorld(), FVector(0, 0, 0), FString::FromInt(PowerLevel), this, FColor::White, 1.0f, true);
+	}
+}
+
+void ASTrackerBot::RefreshPath()
+{
+	NextPathPoint = GetNextPathPoint();
 }
 
