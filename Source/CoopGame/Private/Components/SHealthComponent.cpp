@@ -1,8 +1,10 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Components/SHealthComponent.h"
+
 #include "SGameMode.h"
 #include "Net/UnrealNetwork.h"
+
 
 // Sets default values for this component's properties
 USHealthComponent::USHealthComponent()
@@ -46,6 +48,11 @@ void USHealthComponent::HandleTakeAnyDamage(AActor* DamagedActor, float Damage, 
 	{
 		return;
 	}
+
+	if (DamageCauser != DamagedActor && IsFriendly(DamagedActor, DamageCauser))
+	{
+		return;
+	}
 	
 	Health = FMath::Clamp(Health - Damage, 0.0f, DefaultHealth);
 
@@ -83,7 +90,6 @@ bool USHealthComponent::IsFriendly(AActor* ActorA, AActor* ActorB)
 {
 	if (ActorA == nullptr || ActorB == nullptr)
 	{
-		// Assume Friendly
 		return true;
 	}
 
@@ -92,7 +98,6 @@ bool USHealthComponent::IsFriendly(AActor* ActorA, AActor* ActorB)
 
 	if (HealthCompA == nullptr || HealthCompB == nullptr)
 	{
-		// Assume friendly
 		return true;
 	}
 

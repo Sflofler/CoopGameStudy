@@ -29,6 +29,12 @@ public:
 
 	virtual FVector GetPawnViewLocation() const override;
 
+	UFUNCTION(BlueprintCallable, Category = "Player")
+	void StartFire();
+
+	UFUNCTION(BlueprintCallable, Category = "Player")
+	void StopFire();
+
 protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
@@ -78,10 +84,6 @@ protected:
 	void BeginZoom();
 
 	void EndZoom();
-
-	void StartFire();
-
-	void StopFire();
 
 	UFUNCTION()
 	void HandleHealthChanged(USHealthComponent* UsHealthComponent, float Health, float HealthDelta, const UDamageType* DamageType, AController* InstigatedBy, AActor* DamageCauser);

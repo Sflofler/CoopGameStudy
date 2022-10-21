@@ -32,8 +32,13 @@ protected:
 	UPROPERTY(VisibleDefaultsOnly, Category = "Components")
 	USphereComponent* SphereComp;
 
+	UFUNCTION()
+	void HandleTakeDamage(USHealthComponent* OwningHealthComp, float Health, float HealthDelta, const class UDamageType* DamageType, 
+		class AController* InstigatedBy, AActor* DamageCauser);
+
 	FVector GetNextPathPoint();
-	
+
+	// Next point in navigation path
 	FVector NextPathPoint;
 
 	UPROPERTY(EditDefaultsOnly, Category = "TrackerBot")
@@ -44,14 +49,18 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category = "TrackerBot")
 	float RequiredDistanceToTarget;
-	
+
+	// Dynamic material to pulse on damage
 	UMaterialInstanceDynamic* MatInst;
+
+	void SelfDestruct();
 
 	UPROPERTY(EditDefaultsOnly, Category = "TrackerBot")
 	UParticleSystem* ExplosionEffect;
 
 	bool bExploded;
-	
+
+	// Did we already kick off self destruct timer
 	bool bStartedSelfDestruction;
 
 	UPROPERTY(EditDefaultsOnly, Category = "TrackerBot")
@@ -65,31 +74,31 @@ protected:
 
 	FTimerHandle TimerHandle_SelfDamage;
 
+	void DamageSelf();
+
 	UPROPERTY(EditDefaultsOnly, Category = "TrackerBot")
 	USoundCue* SelfDestructSound;
 
 	UPROPERTY(EditDefaultsOnly, Category = "TrackerBot")
 	USoundCue* ExplodeSound;
-	
+
+public:	
+	// Called every frame
+	virtual void Tick(float DeltaTime) override;
+
+	virtual void NotifyActorBeginOverlap(AActor* OtherActor) override;
+
+protected:
+
+	// CHALLENGE CODE	
+
+	// Find nearby enemies and grow in 'power level' based on the amount.
+	void OnCheckNearbyBots();
+
+	// the power boost of the bot, affects damaged caused to enemies and color of the bot (range: 1 to 4)
 	int32 PowerLevel;
 
 	FTimerHandle TimerHandle_RefreshPath;
 
-	void OnCheckNearbyBots();
-	
 	void RefreshPath();
-
-	void DamageSelf();
-
-	void SelfDestruct();
-
-	UFUNCTION()
-	void HandleTakeDamage(USHealthComponent* OwningHealthComp, float Health, float HealthDelta, const class UDamageType* DamageType,
-		AController* InstigatedBy, AActor* DamageCauser);
-
-public:	
-
-	virtual void Tick(float DeltaTime) override;
-
-	virtual void NotifyActorBeginOverlap(AActor* OtherActor) override;
 };
